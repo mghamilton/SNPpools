@@ -1,0 +1,19 @@
+Package: SNPpools
+Type: Package
+Title: Maximum likelihood parentage assignment using quantitative genotypes
+Version: 0.1.3
+Author: Matthew Hamilton <matthewhamilton75@gmail.com>
+Maintainer: Matthew Hamilton <matthewhamilton75@gmail.com>
+Description: Implements Hamilton MG (2020) Maximum likelihood parentage assignment using quantitative genotypes
+License: GPL-3
+Imports:
+    dplyr,
+    mgcv,
+    RColorBrewer,
+    gplots,
+    ggplot2,
+    reshape2
+Depends: R (>= 3.0.0)
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.1.0
