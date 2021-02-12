@@ -8,6 +8,7 @@ sim.parent.assign.fun(
   n_repetitions,
   ped,
   map,
+  missing.parents = NULL,
   true.snp.param.indiv,
   sim.fam.sets = NULL,
   method,
@@ -50,6 +51,8 @@ It contains the following headings (class in parentheses):
  from a random genotype rather than the true genotype for the SNP_ID).  Refer to Hamilton 2020 (numeric).} 
  \item{'PROP_MISS' is the proportion missing data for the SNP_ID (numeric).} 
 }}
+
+\item{missing.parents}{is a vector idenifying parents with no SNP data (i.e. known missing parents). Samples/individuals in missing.parents must be present as a SIRE_ID or a DAM_ID in ped}
 
 \item{true.snp.param.indiv}{is a data frame detailing the assumed SNP parameters of the population with the following 
 headings (class in parentheses):
