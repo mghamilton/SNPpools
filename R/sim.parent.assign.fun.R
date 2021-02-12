@@ -231,6 +231,7 @@
 sim.parent.assign.fun <- function(n_repetitions,
                                   ped,
                                   map,
+                                  missing.parents = NULL, #vector of parents with no SNP data
                                   true.snp.param.indiv,
                                   sim.fam.sets = NULL,
                                   
@@ -404,6 +405,16 @@ sim.parent.assign.fun <- function(n_repetitions,
     stop("PROP_MISS in map must be between 0 and 1")
   }
   
+  #missing.parents checks
+  
+  if(!is.null(missing.parents)) {
+    missing.parents <- as.integer(missing.parents)
+    
+    if(sum(!missing.parents %in% c(ped$SIRE_ID, ped$DAM_ID)) > 0) {
+      stop("missing.parents must be a SIRE_ID or DAM_ID in ped")
+    }
+  }
+  
   #true.snp.param.indiv checks
   
   if(sum(c("SNP_ID", "MEAN_P_AA", "SD_P_AA", "MEAN_P_AB", "SD_P_AB", "MEAN_P_BB", "SD_P_BB", "A_ALLELE", "B_ALLELE") %in% colnames(true.snp.param.indiv)) != 9) {
@@ -527,7 +538,8 @@ sim.parent.assign.fun <- function(n_repetitions,
     sim.pool <-  sim.pool.fun(map = map, 
                               ped = ped[,c("SAMPLE_ID", "SIRE_ID","DAM_ID")], 
                               true.snp.param.indiv = true.snp.param.indiv, 
-                              indivs.in.sim.pools = indivs.in.sim.pools)
+                              indivs.in.sim.pools = indivs.in.sim.pools,
+                              missing.parents = missing.parents)
     geno.indiv           <- sim.pool$geno.indiv
     geno.pool            <- sim.pool$geno.pool
     true.indivs.in.pool  <- sim.pool$true.indivs.in.pool
@@ -1232,16 +1244,27 @@ sim.geno.pool.fun <- function(sim.geno.indiv, map, indivs.in.sim.pools, n.in.poo
 #############################################################################################
 #############################################################################################
 
-sim.miss.in.snp.dat.indiv <- function(sim.snp.dat.indiv, map) {
+sim.miss.in.snp.dat.indiv <- function(sim.snp.dat.indiv, map, missing.parents = NULL) {
+  
   #map:
   #CHROMOSOME (integer), SNP_ID (character), GENETIC_POSITION (Morgans - numeric), 
   #  B_ALLELE_FREQ (numeric - 0-1), ERROR_RATE (numeric 0-1) , PROP_MISS (numeric 0-1)
   #  sim.snp.dat.indiv <- merge(sim.snp.dat.indiv, map[,c("SNP_ID", "PROP_MISS")], by = "SNP_ID", all.x = TRUE)
   sim.snp.dat.indiv$SNP_ID    <- as.character(sim.snp.dat.indiv$SNP_ID)
+  
   map$SNP_ID    <- as.character(map$SNP_ID)
   sim.snp.dat.indiv <- left_join(sim.snp.dat.indiv, map[,c("SNP_ID", "PROP_MISS")], by = "SNP_ID")
   
   sim.snp.dat.indiv[,"MISSING"] <- runif(n = nrow(sim.snp.dat.indiv)) < sim.snp.dat.indiv[,"PROP_MISS"]
+  
+  #remove data from samples will all SNP missing
+  if(!is.null(missing.parents)) {
+    tmp <- as.character(sim.snp.dat.indiv[,"SAMPLE_ID"])
+    missing.parents <- as.character(missing.parents)  
+    sim.snp.dat.indiv[tmp %in% missing.parents,"MISSING"] <- TRUE
+    rm(tmp)
+  }
+  
   sim.snp.dat.indiv[sim.snp.dat.indiv[,"MISSING"],colnames(sim.snp.dat.indiv) %in% c("INTENSITY_A",  "INTENSITY_B", "OBS_GENO", "GENOTYPE",  "OBS_ALLELIC_PROP")] <- NA
   #sim.snp.dat.indiv <- sim.snp.dat.indiv[!sim.snp.dat.indiv[,"MISSING"],] 
   sim.snp.dat.indiv <- sim.snp.dat.indiv[,!colnames(sim.snp.dat.indiv) %in% c("PROP_MISS", "MISSING")]  
@@ -1257,7 +1280,7 @@ sim.miss.in.snp.dat.indiv <- function(sim.snp.dat.indiv, map) {
 #############################################################################################
 #' @export
 
-sim.pool.fun <- function(map, ped, true.snp.param.indiv, indivs.in.sim.pools) {
+sim.pool.fun <- function(map, ped, true.snp.param.indiv, indivs.in.sim.pools, missing.parents = NULL) {
   
   n.in.pools <- nrow(indivs.in.sim.pools)
   
@@ -1267,7 +1290,7 @@ sim.pool.fun <- function(map, ped, true.snp.param.indiv, indivs.in.sim.pools) {
   geno.indiv <- sim.geno.indiv.fun(map = map, ped = ped)
   
   sim.snp.dat.indiv    <- sim.snp.dat.indiv.fun(geno = geno.indiv, true.snp.param.indiv = true.snp.param.indiv)
-  sim.snp.dat.indiv    <- sim.miss.in.snp.dat.indiv(sim.snp.dat.indiv = sim.snp.dat.indiv, map)
+  sim.snp.dat.indiv    <- sim.miss.in.snp.dat.indiv(sim.snp.dat.indiv = sim.snp.dat.indiv, map, missing.parents = missing.parents)
   
   #pool data
   geno.pool    <- sim.geno.pool.fun(sim.geno.indiv = geno.indiv[,c("SAMPLE_ID", "B_ALLELE_FREQ", "SNP_ID", "TRUE_GENO")], 
@@ -1280,8 +1303,8 @@ sim.pool.fun <- function(map, ped, true.snp.param.indiv, indivs.in.sim.pools) {
   true.snp.param.pools <-  snp.param.pools.fun(snp.param.indiv = true.snp.param.indiv,
                                                n.in.pools) 
   sim.snp.dat.pools <- sim.snp.dat.indiv.fun(geno = geno.pool, true.snp.param.indiv = true.snp.param.pools)
-  sim.snp.dat.pools  <- sim.miss.in.snp.dat.indiv(sim.snp.dat.indiv = sim.snp.dat.pools, map = map)  
-  
+  sim.snp.dat.pools  <- sim.miss.in.snp.dat.indiv(sim.snp.dat.indiv = sim.snp.dat.pools, map = map, missing.parents = missing.parents)  
+
   #estimate parameters from simulated data
   sim.snp.dat.indiv[,"GENOTYPE"] <- sim.snp.dat.indiv[,"OBS_GENO"]
   #  sim.snp.dat.indiv[sim.snp.dat.indiv[,"GENOTYPE"] == "AA" & !is.na(sim.snp.dat.indiv[,"GENOTYPE"]),"GENOTYPE"] <- "A"
